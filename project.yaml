@@ -1,6 +1,29 @@
-contract:
-  data: fift/data.fif
+task1:
   func:
     - func/1.fc
   tests:
     - tests/1_tests.fc
+
+task2:
+  func:
+    - func/2.fc
+  tests:
+    - tests/2_tests.fc
+
+task3:
+  func:
+    - func/3.fc
+  tests:
+    - tests/3_tests.fc
+
+task4:
+  func:
+    - func/4.fc
+  tests:
+    - tests/4_tests.fc
+
+task5:
+  func:
+    - func/5.fc
+  tests:
+    - tests/5_tests.fc
