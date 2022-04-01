@@ -1,0 +1,6 @@
+contract:
+  data: fift/data.fif
+  func:
+    - func/1.fc
+  tests:
+    - tests/1_tests.fc
