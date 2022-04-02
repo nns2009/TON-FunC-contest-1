@@ -1,87 +1,135 @@
-;; Each test function must specify method_id
-;; Test functions method_id need to started from 0
+;; -------------------- GET method test generators --------------------
 
-;; Each test functions must to be in pairs
-;; First funtion expect nothing in arguments
-;; But need to return:
-;;        function selector - which function to test, e.g. 0 for recv_internal, -1 recv_external, 85143 for seqno, and so on
-;;        tuple - stack values needed to be passed to function in tuple
-;;        c4 cell - start data of smart contract
-;;        c7 tuple / null
-;;        gas limit integer / null
+[int, tuple, cell, tuple, int] get_method_data(int value) inline method_id {
+    int function_selector = 128253;
+    cell data = begin_cell().store_uint(value, 64).end_cell();
+    return [function_selector, unsafe_tuple([]), data, get_c7(), null()];
+}
 
-[int, tuple, cell, tuple, int] test_example_data() method_id(0) {
-    ;; Funtion to run (recv_internal)
-    int function_selector = 0;
-
-    ;; Example contract message body
-    cell message = begin_cell()     ;; external message body
-            .store_uint(10, 32)           ;; value to add
-            .end_cell();
-
-    tuple stack = unsafe_tuple([message.begin_parse()]); ;; stack that will be passed to function
-
-    cell data = begin_cell()             ;; initial data of contract
-        .store_uint(0, 64)               ;; counter
-        .end_cell();
-
-    return [function_selector, stack, data, get_c7(), null()];
+_ get_method_check(int exit_code, tuple stack, int expected_value) impure inline method_id {
+    throw_if(103, exit_code != 0);
+    var counter = first(stack);
+    throw_if(104, counter != expected_value); ;;
 }
 
 
-;; After test data function
-;; We need to define test funtion
-;; It will accept:
-;;        exit code - exit code of runvm, here you can check errors / not
-;;        c4 cell - data of smart contract after runvm invokes
-;;        tuple - stack values of smart contract
-;;        c5 cell - here you can check all outcoming messages
-;;        gas - gas that was used
-;; By default test is passed
-;; You can use throw_if to fail test
 
-_ test_example(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+
+
+
+;; -------------------- add message test generators --------------------
+;; int recv_internal_index = 0;
+
+[int, tuple, cell, tuple, int] add_message_test(int value, int bits, int initial_state) inline method_id {
+    cell data = initial_state < 0
+        ? get_prev_c4()
+        : begin_cell().store_uint(initial_state, 64).end_cell();
+    cell message = begin_cell().store_uint(value, bits).end_cell();
+    tuple stack = unsafe_tuple([message.begin_parse()]);
+
+    return [0, stack, data, get_c7(), null()];
+}
+
+_ add_message_check(int exit_code, cell data, int expected_value) impure inline method_id {
     throw_if(100, exit_code != 0); ;; test need to be passed
 
     var ds = data.begin_parse();
 
-    throw_if(101, ds~load_uint(64) != 10); ;; check if counter has been changed
-    throw_if(102, gas > 1000000); ;; check if gas usage is not so big
+    throw_if(101, ds~load_uint(64) != expected_value);
 }
 
 
-;;
-;;   GET method test
-;;
 
-[int, tuple, cell, tuple, int] test_get_total_data() method_id(2) {
-    int function_selector = 128253; ;; funtion to run (128253 is get_total, check contract.fif)
-    cell data = begin_cell()             ;; initial data
-        .store_uint(10, 64)               ;; counter
-        .end_cell();
 
-    return [function_selector, unsafe_tuple([]), data, get_c7(), null()];
+
+
+
+
+
+
+;; -------------------- GET method tests --------------------
+
+[int, tuple, cell, tuple, int] test_get_total_1_data() method_id(0) {
+    return get_method_data(12);
 }
 
-_ test_get_total(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(3) {
-    throw_if(103, exit_code != 0); ;; test need to be passed
-    var counter = first(stack); ;; get answer from get method
-    throw_if(104, counter != 10); ;; test if answer is 10 as we set
+_ test_get_total_1(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+    get_method_check(exit_code, stack, 12);
 }
+
+[int, tuple, cell, tuple, int] test_get_total_2_data() method_id(10) {
+    return get_method_data(4321);
+}
+
+_ test_get_total_2(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(11) {
+    get_method_check(exit_code, stack, 4321);
+}
+
+
+
+
+
+
+
+
+;; -------------------- add message tests --------------------
+
+[int, tuple, cell, tuple, int] test_example_data() method_id(1000) {
+    return add_message_test(10, 32, 0);
+}
+_ test_example(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1001) {
+    add_message_check(exit_code, data, 10);
+}
+
+
+
+[int, tuple, cell, tuple, int] test_1_1_data() method_id(1010) {
+    return add_message_test(20, 32, 5);
+}
+_ test_1_1_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1011) {
+    add_message_check(exit_code, data, 25);
+}
+[int, tuple, cell, tuple, int] test_1_2_data() method_id(1012) {
+    return add_message_test(100, 32, -1);
+}
+_ test_1_2_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1013) {
+    add_message_check(exit_code, data, 125);
+}
+[int, tuple, cell, tuple, int] test_1_3_data() method_id(1014) {
+    return add_message_test(10000, 32, -1);
+}
+_ test_1_3_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1015) {
+    add_message_check(exit_code, data, 10125);
+}
+
+
+
+[int, tuple, cell, tuple, int] test_2_data() method_id(1020) {
+    return add_message_test(12000, 32, 40);
+}
+_ test_2_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1021) {
+    add_message_check(exit_code, data, 12040);
+}
+
+
+
+
 
 
 
 ;; -------------------- <32 bits incoming message --------------------
-[int, tuple, cell, tuple, int] test_short_message_data() method_id(4) {
-    int function_selector = 0;
-    cell message = begin_cell().store_uint(10, 31).end_cell();
-    tuple stack = unsafe_tuple([message.begin_parse()]);
-    cell data = begin_cell().store_uint(0, 64).end_cell();
+;; error needs to happen
 
-    return [function_selector, stack, data, get_c7(), null()];
+[int, tuple, cell, tuple, int] test_short_message_1_data() method_id(1300) {
+    return add_message_test(10, 31, 0);
+}
+_ test_short_message_1(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1301) {
+    throw_if(601, exit_code == 0);
 }
 
-_ test_short_message(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(5) {
-    throw_if(101, exit_code == 0); ;; error needs to happen
+[int, tuple, cell, tuple, int] test_short_message_2_data() method_id(1302) {
+    return add_message_test(0, 1, 0);
 }
-
+_ test_short_message_2(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1303) {
+    throw_if(601, exit_code == 0);
+}
