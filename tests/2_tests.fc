@@ -1,0 +1,101 @@
+global slice address1;
+global slice address2;
+global slice address3;
+
+global slice payload1;
+
+() init() impure inline method_id {
+    ;; slice address1 = begin_cell().store_uint(4, 3).store_uint(wc, 8).store_uint(addr, 256).end_cell();
+    address1 = begin_cell().store_uint(4, 3).store_uint(35, 8).store_uint(1111, 256).bto_slice();
+    address2 = begin_cell().store_uint(4, 3).store_uint(154, 8).store_uint(44444, 256).bto_slice();
+    address3 = begin_cell().store_uint(4, 3).store_uint(213, 8).store_uint(777777, 256).bto_slice();
+    
+    payload1 = begin_cell().store_uint(0xc79ef4a2d9f62e3524589863b094, 240).bto_slice();
+}
+
+
+[int, tuple, cell, tuple, int] test_1_data() method_id(0) {
+    init();
+
+    int balance = 1000 * 1000;
+    int msg_value = 100 * 1000;
+
+    slice in_msg_body = payload1;
+    cell in_msg_full = begin_cell()
+        .store_uint(6, 4)
+        .store_slice(address1)
+        .store_slice(address2)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_slice(in_msg_body)
+        .end_cell();
+
+    tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+
+    return [0, stack, address3.to_cell(), get_c7(), null()];
+}
+
+   
+_ test_1(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+    init();
+    
+    throw_if(100, exit_code != 0);
+    
+
+    ;; ---------------- Check storage
+    var ds = data.begin_parse();
+    throw_unless(104, slice_equal?(ds, address3));
+    
+    
+    ;; ---------------- Parse actions list
+    ;; prev:^(OutList n)
+    ;; #0ec3c86d
+    ;; mode:(## 8)
+    ;; out_msg:^(MessageRelaxed Any)
+    ;; = OutList (n + 1);
+    slice cs = actions.begin_parse();
+    throw_unless(110, cs.slice_refs() == 2);
+    
+    cell prev_actions = cs~load_ref();
+    throw_unless(111, prev_actions.cell_empty?());
+    
+    int action_type = cs~load_uint(32);
+    throw_unless(113, action_type == 0x0ec3c86d);
+    
+    int msg_mode = cs~load_uint(8);
+    throw_unless(115, msg_mode == 64); ;; !!! check msg_mode
+    
+    cell msg = cs~load_ref();
+    throw_unless(117, cs.slice_empty?());
+    cs.end_parse();
+    
+    
+    ;; ---------------- Parse single message
+    cs = msg.begin_parse();
+
+    int flags = cs~load_uint(4);
+    throw_unless(131, flags == 6);
+
+    slice contract_address = cs~load_msg_addr(); ;; tested contract address
+    throw_unless(142, slice_equal?(contract_address, ito_slice(0, 2)));
+
+    slice owner_address = cs~load_msg_addr();
+    throw_unless(145, slice_equal?(owner_address, address3));
+
+    int grams = cs~load_grams();
+    throw_unless(148, grams == 0); ;; !!! is this even correct?
+
+    int some_zeros = cs~load_uint(1 + 4 + 4 + 64 + 32 + 1 + 1);
+    throw_unless(150, some_zeros == 0);
+
+    slice sender_address = cs~load_msg_addr();
+    throw_unless(153, slice_equal?(sender_address, address1));
+
+    throw_unless(158, cs.slice_refs() == 1);
+    cell inner_msg_body = cs~load_ref();
+    throw_unless(160, cs.slice_empty?());
+    
+    cs = inner_msg_body.begin_parse();
+    throw_unless(164, slice_equal?(cs, payload1));
+}
+

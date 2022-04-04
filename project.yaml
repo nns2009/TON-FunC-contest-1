@@ -8,6 +8,7 @@ task2:
   func:
     - func/2.fc
   tests:
+    - tests/my.fc
     - tests/2_tests.fc
 
 task3:
