@@ -1,3 +1,5 @@
+;; ---------------- fift-asm operations
+
 ;; Slice "literals"
 ;; https://t.me/tondev/62935
 slice my_slice() asm "x{deadbeef} PUSHSLICE";
@@ -12,11 +14,12 @@ int slice_equal? (slice a, slice b) asm "HASHSU SWAP HASHSU EQUAL";
 
 ;; Based on tvm.pdf - seems correct
 builder store_builder(builder a, builder b) inline asm "STBR";
+builder store_zeros(builder b, int count) inline asm "STZEROES"; 
 
 
 
 
-
+;; ---------------- Slice, cell, builder conversions
 slice bto_slice(builder b) inline method_id {
     return b.end_cell().begin_parse();
 }
@@ -30,8 +33,124 @@ cell to_cell(slice s) inline method_id {
 }
 
 
+;; ---------------- Slice creation
+slice slice_zeros(int count) inline method_id {
+    return begin_cell().store_zeros(count).bto_slice();
+}
+
+
+
 
 ;; ---------------- Integer functions
 slice ito_slice(int i, int len) inline method_id {
     return begin_cell().store_int(i, len).end_cell().begin_parse();
 }
+
+
+;; ---------------- Slice assert functions
+slice assert_equal(slice s, slice expected_value, int error_code) impure inline method_id {
+    throw_unless(error_code, slice_equal?(s, expected_value));
+    return s;
+}
+
+
+
+
+;; ---------------- Slice expect functions
+slice expect_uint(slice s, int expected_value, int len, int error_code) impure inline method_id {
+    int value = s~load_uint(len);
+    throw_unless(error_code, value == expected_value);
+    return s;
+}
+(slice, ()) ~expect_uint(slice s, int expected_value, int len, int error_code) impure inline method_id {
+    return (expect_uint(s, expected_value, len, error_code), ());
+}
+
+
+slice expect_grams(slice s, int expected_value, int error_code) impure inline method_id {
+    int value = s~load_grams();
+    throw_unless(error_code, value == expected_value);
+    return s;
+}
+(slice, ()) ~expect_grams(slice s, int expected_value, int error_code) impure inline method_id {
+    return (expect_grams(s, expected_value, error_code), ());
+}
+
+
+slice expect_msg_addr(slice s, slice expected_addr, int error_code) impure inline method_id {
+    slice addr = s~load_msg_addr();
+    throw_unless(error_code, slice_equal?(addr, expected_addr));
+    return s;
+}
+(slice, ()) ~expect_msg_addr(slice s, slice expected_addr, int error_code) impure inline method_id {
+    return (expect_msg_addr(s, expected_addr, error_code), ());
+}
+
+
+(slice, cell) expect_single_ref(slice s, int error_code) impure inline method_id {
+    throw_unless(error_code, s.slice_refs() == 1);
+    cell c = s~load_ref();
+    return (s, c);
+}
+
+
+slice expect_slice(slice s, slice expected_prefix, int error_code) impure inline method_id {
+    int prefix_len = expected_prefix.slice_bits();
+    throw_unless(error_code, s.slice_bits() >= prefix_len);
+    slice prefix = s~load_bits(prefix_len);
+    throw_unless(error_code + 1, slice_equal?(prefix, expected_prefix));
+    return s;
+}
+(slice, ()) ~expect_slice(slice s, slice expected_prefix, int error_code) impure inline method_id {
+    return (expect_slice(s, expected_prefix, error_code), ());
+}
+
+
+slice expect_zeros(slice s, int count, int error_code) impure inline method_id {
+    return expect_slice(s, slice_zeros(count), error_code);
+}
+(slice, ()) ~expect_zeros(slice s, int count, int error_code) impure inline method_id {
+    return (expect_zeros(s, count, error_code), ());
+}
+
+
+(slice, ()) expect_empty(slice s, int error_code) impure inline method_id {
+    throw_unless(error_code, s.slice_empty?());
+    return (s, ());
+}
+
+
+
+
+;; ---------------- Test functions
+(int, cell) extract_single_message(cell actions) impure inline method_id {
+    ;; ---------------- Parse actions list
+    ;; prev:^(OutList n)
+    ;; #0ec3c86d
+    ;; mode:(## 8)
+    ;; out_msg:^(MessageRelaxed Any)
+    ;; = OutList (n + 1);
+    slice cs = actions.begin_parse();
+    throw_unless(1010, cs.slice_refs() == 2);
+    
+    cell prev_actions = cs~load_ref();
+    throw_unless(1011, prev_actions.cell_empty?());
+    
+    int action_type = cs~load_uint(32);
+    throw_unless(1013, action_type == 0x0ec3c86d);
+    
+    int msg_mode = cs~load_uint(8);
+    throw_unless(1015, msg_mode == 64); ;; !!! check msg_mode
+    
+    cell msg = cs~load_ref();
+    throw_unless(1017, cs.slice_empty?());
+    
+    return (msg_mode, msg);
+}
+cell extract_single_message_of_mode(cell actions, int expected_mode) impure inline method_id {
+    (int msg_mode, cell msg) = extract_single_message(actions);
+    throw_unless(1017, msg_mode == expected_mode);
+    
+    return msg;
+}
+
