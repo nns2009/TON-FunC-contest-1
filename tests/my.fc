@@ -9,6 +9,7 @@ int slice_data_equal? (slice a, slice b) asm "SDEQ";
 
 ;; https://t.me/tondev/62982
 ;; !!! doesn't work
+int cell_hash?(cell c) inline method_id asm "HASHCU";
 int cell_equal? (cell a, cell b) inline method_id asm "HASHCU SWAP HASHCU EQUAL";
 int slice_equal? (slice a, slice b) asm "HASHSU SWAP HASHSU EQUAL";
 
@@ -16,7 +17,17 @@ int slice_equal? (slice a, slice b) asm "HASHSU SWAP HASHSU EQUAL";
 builder store_builder(builder a, builder b) inline asm "STBR";
 builder store_zeros(builder b, int count) inline asm "STZEROES"; 
 
+forall X -> int is_tuple?(X object) inline asm "ISTUPLE";
 
+;; x{D73B} @Defop XLOADQ
+
+int actions_empty3?(cell c) inline asm "TRY:<{ CTOS DROP FALSE }>CATCH<{ DROP TRUE }>";
+int actions_empty?2(cell c) inline asm "XLOADQ SWAP DROP";
+
+
+
+() assert_actions_empty(cell c, int error_code) impure inline method_id
+{ } ;; !!! fill
 
 
 ;; ---------------- Slice, cell, builder conversions
@@ -39,6 +50,13 @@ slice slice_zeros(int count) inline method_id {
 }
 
 
+;; ---------------- Slice creation
+cell cell_from_2_slice(slice a, slice b) inline method_id {
+	return begin_cell()
+		.store_slice(a)
+		.store_slice(b)
+		.end_cell();
+}
 
 
 ;; ---------------- Integer functions
@@ -155,17 +173,17 @@ cell extract_single_message_of_mode(cell actions, int expected_mode) impure inli
 }
 
 
-slice expect_typical_inline_header_from(slice cs, slice expected_sender) impure inline method_id {
+slice expect_typical_inline_header_to(slice cs, slice expected_receiver) impure inline method_id {
 	int error_code = 2000;
     cs~expect_uint(6, 4, error_code); ;; flags
     cs~expect_msg_addr(slice_zeros(2), error_code + 2);
-    cs~expect_msg_addr(expected_sender, error_code + 4);
+    cs~expect_msg_addr(expected_receiver, error_code + 4);
     cs~expect_grams(0, error_code + 6); ;; !!! is this even correct?
     cs~expect_zeros(1 + 4 + 4 + 64 + 32 + 1 + 1, error_code + 8);
     return cs;
 }
-(slice, ()) ~expect_typical_inline_header_from(slice cs, slice expected_sender) impure inline method_id {
-	return (expect_typical_inline_header_from(cs, expected_sender), ());
+(slice, ()) ~expect_typical_inline_header_to(slice cs, slice expected_sender) impure inline method_id {
+	return (expect_typical_inline_header_to(cs, expected_sender), ());
 }
 
 
