@@ -7,15 +7,18 @@ The aim of address memorizer contract is to remember the address set by Manager 
 In particular:
 
 * when contract get internal message
-	+ from Manager with
-	- 32-bit unsigned `op` equal to 1 followed by
-	- some 64-bit unsigned `query_id`, followed by
+	+ from Manager which contains the following three fields:
+	- 32-bit unsigned `op` equal to 1 immediately followed by
+	- some 64-bit unsigned `query_id`, immediately followed by
 	- valid MsgAddress,
 	then
 	: it should store obtained address in the storage.
+	
+	! Note, tests will not cover cases when messages contain valid `op`, `query_id`, `address` and then something else (that means that participants may handle such messages at their discretion).
 
-* when contract get internal message from any address with
-	- 32-bit unsigned `op` equal to 2 followed by
+* when contract get internal message
+	+ from any address which contains the following two fields:
+	- 32-bit unsigned `op` equal to `2` immediately followed by
 	- some 64-bit unsigned `query_id`,
 	then
 	: it should response to sender with message with body containing:
@@ -24,14 +27,17 @@ In particular:
 	3) Manager's address
 	4) Address which was memorized since last Manager request (empty address `addr_none` if there were no Manager request yet)
 	5) TON value attached to message should be incoming value minus processing fees
+	
+	! Note, tests will not cover cases when messages contain valid `op=2`, `query_id` and then something else (that means that participants may handle such messages at their discretion).
 
-* when address memorizer get any other message
+* when address memorizer get any internal message which is not covered by description above
 	then
-	: it should throw
+	: it should throw with any exit code > 1.
 
-The initial address memorizer storage contains owner address immediately followed by empty address (`addr_none` constructor for MsgAddress).
+The initial address memorizer storage contains Manager address immediately followed by empty address (`addr_none` constructor for MsgAddress).
 
 -}
+
 
 int slice_data_equal? (slice a, slice b) asm "SDEQ";
 
