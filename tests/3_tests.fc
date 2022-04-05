@@ -1,3 +1,4 @@
+global slice empty_slice;
 global slice address_none; 
 global slice address_1;
 global slice address_2;
@@ -6,6 +7,8 @@ global slice address_4;
 global slice address_5;
 
 () init() impure inline method_id {
+	empty_slice = begin_cell().bto_slice();
+
     ;; slice address1 = begin_cell().store_uint(4, 3).store_uint(wc, 8).store_uint(addr, 256).end_cell();
     address_none = begin_cell().store_uint(0, 2).bto_slice();
 
@@ -49,6 +52,26 @@ global slice address_5;
 	init();
 	return (address_1, address_2, address_3, address_5, 9090902345);
 }
+
+;; ---------------- Universal Test Generators ----------------
+
+[int, tuple, cell, tuple, int] third_universal_test_data(
+	slice address_sender, slice address_contract, slice address_manager,
+	slice address_memorized,
+	int op, int query_id, slice payload
+) inline method_id
+{
+    cell data = cell_from_2_slice(address_manager, address_memorized);
+
+    slice in_msg_body = begin_cell()
+        .store_uint(op, 32)
+        .store_uint(query_id, 64)
+        .store_slice(payload)
+        .bto_slice();
+
+	return create_typical_recv_internal_test_data(data, address_sender, address_contract, in_msg_body);
+}
+
 
 ;; ---------------- Change Address Test Generators ----------------
 
@@ -145,7 +168,7 @@ _ request_address_test_check(
 
 
 
-;; ---------------- Tests ----------------
+;; ---------------- Test sequence ----------------
 
 [int, tuple, cell, tuple, int] third_1a_data() method_id(0) {
 	return request_address_test_data(third_1a_params);
@@ -184,4 +207,30 @@ _ third_1d_check(int exit_code, cell data, tuple stack, cell actions, int gas) m
 }
 _ third_1e_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(41) {
 	request_address_test_check(third_1e_params, exit_code, data, stack, actions, gas);
+}
+
+
+;; ---------------- Wrong "op" - Throw test ----------------
+[int, tuple, cell, tuple, int] third_wrong_op_data() method_id(100) {
+	init();
+	return third_universal_test_data(
+		address_1, address_2, address_1,
+		address_5,
+		5, 12349824, address_4);
+}
+_ third_wrong_op_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(101) {
+	error_test_check(exit_code, actions);
+}
+
+
+;; ---------------- No valid MsgAddress - Throw test ----------------
+[int, tuple, cell, tuple, int] third_no_payload_data() method_id(200) {
+	init();
+	return third_universal_test_data(
+		address_1, address_2, address_1,
+		address_5,
+		1, 64328, empty_slice);
+}
+_ third_no_payload_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(201) {
+	error_test_check(exit_code, actions);
 }

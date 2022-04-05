@@ -22,8 +22,8 @@ forall X -> int is_tuple?(X object) inline asm "ISTUPLE";
 ;; x{D73B} @Defop XLOADQ
 
 int actions_empty?(cell a) inline asm "<{ CTOS DROP 0 PUSHINT }>CONT <{ DROP -1 PUSHINT }>CONT 1 1 TRYARGS";
-int actions_empty3?(cell c) inline asm "TRY:<{ CTOS DROP FALSE }>CATCH<{ DROP TRUE }>";
-int actions_empty?2(cell c) inline asm "XLOADQ SWAP DROP";
+;; int actions_empty3?(cell c) inline asm "TRY:<{ CTOS DROP FALSE }>CATCH<{ DROP TRUE }>";
+;; int actions_empty?2(cell c) inline asm "XLOADQ SWAP DROP";
 
 
 
@@ -51,7 +51,7 @@ slice slice_zeros(int count) inline method_id {
 }
 
 
-;; ---------------- Slice creation
+;; ---------------- Cell creation
 cell cell_from_2_slice(slice a, slice b) inline method_id {
 	return begin_cell()
 		.store_slice(a)
@@ -215,3 +215,7 @@ cell create_typical_inline_message(slice sender, slice receiver, slice in_msg_bo
     return [0, stack, data, get_c7(), null()];
 }
 
+_ error_test_check(int exit_code, cell actions) impure inline method_id {
+	throw_unless(200, exit_code > 1);
+	throw_unless(99, actions_empty?(actions));
+}
