@@ -15,6 +15,7 @@ task3:
   func:
     - func/3.fc
   tests:
+    - tests/my.fc
     - tests/3_tests.fc
 
 task4:

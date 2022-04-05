@@ -1,0 +1,65 @@
+global slice address_none; 
+global slice address_sender;
+global slice address_contract;
+global slice address_manager;
+
+global int query_id1;
+;;global slice stored_data;
+
+
+() third_1a_shared() impure inline method_id {
+    ;; slice address1 = begin_cell().store_uint(4, 3).store_uint(wc, 8).store_uint(addr, 256).end_cell();
+    address_none = begin_cell().store_uint(0, 2).bto_slice();
+    
+    address_sender = begin_cell().store_uint(4, 3).store_uint(35, 8).store_uint(1111, 256).bto_slice();
+    address_contract = begin_cell().store_uint(4, 3).store_uint(154, 8).store_uint(44444, 256).bto_slice();
+    address_manager = begin_cell().store_uint(4, 3).store_uint(213, 8).store_uint(777777, 256).bto_slice();
+    
+    query_id1 = 198456;
+}
+
+
+[int, tuple, cell, tuple, int] third_1a_data() method_id(0) {
+    third_1a_shared();
+    
+    cell data = begin_cell()
+        .store_slice(address_manager)
+        .store_slice(address_none)
+        .end_cell();
+
+    slice in_msg_body = begin_cell()
+        .store_uint(2, 32)
+        .store_uint(query_id1, 64)
+        .bto_slice();
+    
+    return create_typical_recv_internal_test_data(data, address_sender, address_contract, in_msg_body);
+}
+
+   
+_ third_1a(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+    third_1a_shared();
+    
+    throw_if(100, exit_code != 0);
+    
+
+    ;; ---------------- Check storage
+    cell expected_data = begin_cell()
+            .store_slice(address_manager)
+            .store_slice(address_none)
+            .end_cell();
+    ;;var ds = data.begin_parse();
+    throw_unless(111, cell_equal?(data, expected_data));
+    
+    
+    ;; ---------------- Parse message
+    cell msg = extract_single_message_of_mode(actions, 64);
+    slice cs = msg.begin_parse();
+    cs~expect_typical_inline_header_from(address_sender);
+    
+	cs~expect_uint(3, 32, 154);
+	cs~expect_uint(query_id1, 64, 157);
+	cs~expect_msg_addr(address_manager, 161);
+	cs~expect_msg_addr(address_none, 165);
+    cs~expect_empty(170);
+}
+

@@ -154,3 +154,45 @@ cell extract_single_message_of_mode(cell actions, int expected_mode) impure inli
     return msg;
 }
 
+
+slice expect_typical_inline_header_from(slice cs, slice expected_sender) impure inline method_id {
+	int error_code = 2000;
+    cs~expect_uint(6, 4, error_code); ;; flags
+    cs~expect_msg_addr(slice_zeros(2), error_code + 2);
+    cs~expect_msg_addr(expected_sender, error_code + 4);
+    cs~expect_grams(0, error_code + 6); ;; !!! is this even correct?
+    cs~expect_zeros(1 + 4 + 4 + 64 + 32 + 1 + 1, error_code + 8);
+    return cs;
+}
+(slice, ()) ~expect_typical_inline_header_from(slice cs, slice expected_sender) impure inline method_id {
+	return (expect_typical_inline_header_from(cs, expected_sender), ());
+}
+
+
+;; ---------------- Generators
+cell create_typical_inline_message(slice sender, slice receiver, slice in_msg_body) inline method_id {
+    cell in_msg_full = begin_cell()
+        .store_uint(6, 4)
+        .store_slice(sender)
+        .store_slice(receiver)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+        .store_slice(in_msg_body)
+        .end_cell();
+	return in_msg_full;
+}
+
+[int, tuple, cell, tuple, int] create_typical_recv_internal_test_data(
+	cell data,
+	slice sender, slice receiver,
+	slice in_msg_body
+) inline method_id {
+    int balance = 1000 * 1000;
+    int msg_value = 100 * 1000;
+    
+    cell in_msg_full = create_typical_inline_message(sender, receiver, in_msg_body);
+    tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+    
+    return [0, stack, data, get_c7(), null()];
+}
+
