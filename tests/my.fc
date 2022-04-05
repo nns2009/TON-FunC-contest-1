@@ -21,13 +21,14 @@ forall X -> int is_tuple?(X object) inline asm "ISTUPLE";
 
 ;; x{D73B} @Defop XLOADQ
 
+int actions_empty?(cell a) inline asm "<{ CTOS DROP 0 PUSHINT }>CONT <{ DROP -1 PUSHINT }>CONT 1 1 TRYARGS";
 int actions_empty3?(cell c) inline asm "TRY:<{ CTOS DROP FALSE }>CATCH<{ DROP TRUE }>";
 int actions_empty?2(cell c) inline asm "XLOADQ SWAP DROP";
 
 
 
 () assert_actions_empty(cell c, int error_code) impure inline method_id
-{ } ;; !!! fill
+{ throw_unless(error_code, actions_empty?(c)); }
 
 
 ;; ---------------- Slice, cell, builder conversions
