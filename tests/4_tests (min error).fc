@@ -1,0 +1,117 @@
+
+
+
+;; ;; ---------------- Set Entry Test Generators ----------------
+
+;; [int, tuple, cell, tuple, int] set_entry_data(
+;; 	cell data, int query_id, slice key, int valid_until, slice value
+;; ) inline method_id
+;; {
+;;     slice in_msg_body = begin_cell()
+;;         .store_uint(1, 32)
+;;         .store_uint(query_id, 64)
+;; 		.store_slice(key)
+;; 		.store_uint(valid_until, 64)
+;; 		.store_slice(value)
+;;         .bto_slice();
+
+;; 	slice sen = address_sender;
+;; 	sen~touch();
+;; 	sen~dump();
+;; 	slice rec = address_contract;
+;; 	rec~touch();
+;; 	rec~dump();
+
+;; 	return create_typical_recv_internal_test_data(data, sen, rec, in_msg_body);
+;; }
+;; _ set_entry_check(int exit_code, cell actions) impure inline method_id
+;; {
+;; 	throw_unless(100, exit_code == 0);
+;; 	throw_if(110, actions_empty?(actions));
+;; }
+
+;; ;; ---------------- Remove Outdated Test Generators ----------------
+
+;; [int, tuple, cell, tuple, int] remove_outdated_data(
+;; 	cell data, int query_id, int time_now
+;; ) inline method_id
+;; {
+;;     slice in_msg_body = begin_cell()
+;;         .store_uint(2, 32)
+;;         .store_uint(query_id, 64)
+;;         .bto_slice();
+
+;; 	;; !!! set time_now
+
+;; 	return create_typical_recv_internal_test_data(data, address_sender, address_contract, in_msg_body);
+;; }
+;; _ remove_outdated_check(int exit_code, cell actions) impure inline method_id
+;; {
+;; 	throw_unless(100, exit_code == 0);
+;; 	throw_if(110, actions_empty?(actions));
+;; }
+
+
+
+
+
+;; ---------------- Test sequence ----------------
+
+[int, tuple, cell, tuple, int] fourth_1a_data() method_id(0) {
+	int balance = 1000 * 1000;
+    int msg_value = 100 * 1000;
+
+	slice kkk1 = uto_slice(21342312344, 256);
+	slice vvv2 = 22.uto_slice(6);
+
+
+	slice sen = begin_cell().store_uint(4, 3).store_uint(10, 8).store_uint(111, 256).bto_slice();
+	slice rec = begin_cell().store_uint(4, 3).store_uint(10, 8).store_uint(111, 256).bto_slice();
+
+	var zhuk = 
+		begin_cell()
+		.store_zeros(1000)
+		.store_uint(1, 24)
+		.end_cell();
+	zhuk~impure_touch();
+
+    slice in_msg_body =
+		;; begin_cell().store_uint(5, 90).end_cell().begin_parse();
+		begin_cell()
+		.store_uint(1, 32)
+		.store_uint(242134, 64)
+        .store_slice(kkk1)
+		.store_slice(vvv2)
+        .end_cell().begin_parse();
+    cell in_msg_full = begin_cell()
+        .store_uint(6, 4)
+        .store_slice(sen)
+        .store_slice(rec)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1)
+		.store_uint(0, 1) ;; in_place
+		.store_slice(in_msg_body)
+		;; .store_uint(1, 1) ;; not in_place
+		;; .store_ref(in_msg_body.to_cell())
+        .end_cell();
+
+    tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+
+    return [0, stack, begin_cell().end_cell(), get_c7(), null()];
+
+
+	;; dump_stack();
+	;; init();
+	;; slice kkk = key2;
+	;; ~dump(kkk);
+	;; throw(90);
+	;; return set_entry_data(empty_cell, 81234, key1, valid_until_1, value1);
+}
+_ fourth_1a_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+	;; set_entry_check(exit_code, actions);
+}
+
+
+
+
+;; !!! Test with full 1023 payload

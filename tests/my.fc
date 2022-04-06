@@ -15,7 +15,9 @@ int slice_equal? (slice a, slice b) asm "HASHSU SWAP HASHSU EQUAL";
 
 ;; Based on tvm.pdf - seems correct
 builder store_builder(builder a, builder b) inline asm "STBR";
-builder store_zeros(builder b, int count) inline asm "STZEROES"; 
+builder store_zeros(builder b, int count) inline asm "STZEROES";
+builder store_ones(builder b, int count) inline asm "STONES";
+int bits_remaining(builder b) inline asm "BREMBITS";
 
 forall X -> int is_tuple?(X object) inline asm "ISTUPLE";
 
@@ -49,6 +51,9 @@ cell to_cell(slice s) inline method_id {
 slice slice_zeros(int count) inline method_id {
     return begin_cell().store_zeros(count).bto_slice();
 }
+slice slice_ones(int count) inline method_id {
+    return begin_cell().store_ones(count).bto_slice();
+}
 
 
 ;; ---------------- Cell creation
@@ -63,6 +68,9 @@ cell cell_from_2_slice(slice a, slice b) inline method_id {
 ;; ---------------- Integer functions
 slice ito_slice(int i, int len) inline method_id {
     return begin_cell().store_int(i, len).end_cell().begin_parse();
+}
+slice uto_slice(int u, int len) inline method_id {
+    return begin_cell().store_uint(u, len).end_cell().begin_parse();
 }
 
 
@@ -201,6 +209,27 @@ cell create_typical_inline_message(slice sender, slice receiver, slice in_msg_bo
 	return in_msg_full;
 }
 
+cell create_typical_auto_message(slice sender, slice receiver, slice in_msg_body) inline method_id {
+    builder in_msg_full = begin_cell()
+        .store_uint(6, 4)
+        .store_slice(sender)
+        .store_slice(receiver)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1);
+
+    if (in_msg_full.bits_remaining() >= 1 + in_msg_body.slice_bits()) {
+        in_msg_full = in_msg_full
+            .store_uint(0, 1) ;; in place
+            .store_slice(in_msg_body);
+    } else {
+        in_msg_full = in_msg_full
+            .store_uint(1, 1) ;; in reference
+            .store_ref(in_msg_body.to_cell());
+    }
+
+	return in_msg_full.end_cell();
+}
+
 [int, tuple, cell, tuple, int] create_typical_recv_internal_test_data(
 	cell data,
 	slice sender, slice receiver,
@@ -209,7 +238,7 @@ cell create_typical_inline_message(slice sender, slice receiver, slice in_msg_bo
     int balance = 1000 * 1000;
     int msg_value = 100 * 1000;
     
-    cell in_msg_full = create_typical_inline_message(sender, receiver, in_msg_body);
+    cell in_msg_full = create_typical_auto_message(sender, receiver, in_msg_body);
     tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
     
     return [0, stack, data, get_c7(), null()];

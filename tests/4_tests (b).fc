@@ -1,0 +1,201 @@
+global cell empty_cell;
+global slice empty_slice;
+
+global slice address_sender;
+global slice address_contract;
+
+global int key_len;
+
+;; global slice key0000;
+;; global slice key1111;
+
+global slice key1;
+global slice key2;
+;; global slice key3;
+;; global slice key4;
+;; global slice key5;
+;; global slice key6;
+
+global int valid_until_1;
+global int valid_until_2;
+;; global int valid_until_3;
+;; global int valid_until_4;
+;; global int valid_until_5;
+
+global int max_value_len;
+
+global slice value_empty;
+;; global slice value_longest_0s;
+;; global slice value_longest_1s;
+global slice value1;
+global slice value2;
+;; global slice value3;
+;; global slice value4;
+;; global slice value5;
+;; global slice value6;
+;;global slice value7;
+
+() init() impure inline method_id {
+	empty_cell = begin_cell().end_cell();
+	empty_slice = begin_cell().bto_slice();
+
+	address_sender = begin_cell().store_uint(4, 3).store_uint(10, 8).store_uint(111, 256).bto_slice();
+	address_contract = begin_cell().store_uint(4, 3).store_uint(20, 8).store_uint(2222, 256).bto_slice();
+
+	key_len = 256;
+
+	;; key0000 = slice_zeros(key_len);
+	;; key1111 = slice_ones(key_len);
+
+	key1 = 0x15dd3f9b1bde67aa823566263367704ede4dac6e8b899278bec8c0b0811f.uto_slice(key_len);
+	key2 = 0x4af78f5731c76a9114b0059a4e50b8409c90b08540584edf7e0b954e444e.uto_slice(key_len);
+	;; key1 = 0x15dd3f9fbbb1bde67aa823566263367704ede48dac6e8b899278bec8c0b0811f.uto_slice(key_len);
+	;; key2 = 0x4af78f5731c76a9114b0059a4e50b8409c987490b08540584edf7e0b954e444e.uto_slice(key_len);
+	
+	;; key3 = uto_slice(0x66e6d6994c559aa9e8a946abc1feb128d7b7ef5e3cc568240cbf4d5c93668565, key_len); ;;.uto_slice(key_len);
+	;; key4 = 0x96949133dbe5122b14fe6bc0449170e59bad5dbca927363b2118f8ab4734bd5c.uto_slice(key_len);
+	;; key5 = 0xa3c3128c49472822b5d21f18f1165581dba82c09d4ab7bd3a482cd2eefde9924.uto_slice(key_len);
+	;; key6 = 0xdbab551d6e14cdf1f3f628c03f27a3484df7062e59bd9131a2114b405f224e40.uto_slice(key_len);
+	;; key3 = uto_slice(0x66e6d6994c559aa9e8a946abc1feb128d7b7ef5e3cc568240cbf4d5c93668565, key_len);
+	;; ~dump(key3);
+	;; key4 = uto_slice(0x96949133dbe5122b14fe6bc0449170e59bad5dbca927363b2118f8ab4734bd5c, key_len);
+	;; ~dump(key4);
+	;; key5 = uto_slice(0xa3c3128c49472822b5d21f18f1165581dba82c09d4ab7bd3a482cd2eefde9924, key_len);
+	;; ~dump(key5);
+	;; key6 = uto_slice(0xdbab551d6e14cdf1f3f628c03f27a3484df7062e59bd9131a2114b405f224e40, key_len);
+	;; ~dump(key6);
+
+	valid_until_1 = 1111;
+	valid_until_2 = 22222;
+	;; valid_until_3 = 333333;
+	;; valid_until_4 = 4444444;
+	;; valid_until_5 = 55555555;
+
+	max_value_len = 500;
+		;; 1023 ;; max cell size
+		;; - 32 ;; op
+		;; - 64 ;; query_id
+		;; - key_len
+		;; - 64; ;; valid_until
+
+	value_empty = empty_slice;
+	;; value_longest_0s = slice_zeros(max_value_len);
+	;; value_longest_1s = slice_ones(max_value_len);
+	value1 = 0x11111.uto_slice(21);
+	value2 = 0x222222222.uto_slice(38);
+	;; value3 = 0x33333333333333.uto_slice(62);
+	;; value4 = 0x44444444444444444444444.uto_slice(101);
+	;; value5 = 0x55555555555555555555555555555555555.uto_slice(150);
+	;; value6 = 0x6666666666666666666666666666666666666666666666666666.uto_slice(230);
+
+
+	;; ~dump(key3);
+	;; ~dump(key4);
+	;; ~dump(key5);
+	;; ~dump(key6);
+
+}
+
+
+
+
+;; ---------------- Set Entry Test Generators ----------------
+
+[int, tuple, cell, tuple, int] set_entry_data(
+	cell data, int query_id, slice key, int valid_until, slice value
+) inline method_id
+{
+    slice in_msg_body = begin_cell()
+        .store_uint(1, 32)
+        .store_uint(query_id, 64)
+		.store_slice(key)
+		.store_uint(valid_until, 64)
+		.store_slice(value)
+        .bto_slice();
+
+	slice sen = address_sender;
+	sen~touch();
+	sen~dump();
+	slice rec = address_contract;
+	rec~touch();
+	rec~dump();
+
+	return create_typical_recv_internal_test_data(data, sen, rec, in_msg_body);
+}
+_ set_entry_check(int exit_code, cell actions) impure inline method_id
+{
+	throw_unless(100, exit_code == 0);
+	throw_if(110, actions_empty?(actions));
+}
+
+;; ---------------- Remove Outdated Test Generators ----------------
+
+[int, tuple, cell, tuple, int] remove_outdated_data(
+	cell data, int query_id, int time_now
+) inline method_id
+{
+    slice in_msg_body = begin_cell()
+        .store_uint(2, 32)
+        .store_uint(query_id, 64)
+        .bto_slice();
+
+	;; !!! set time_now
+
+	return create_typical_recv_internal_test_data(data, address_sender, address_contract, in_msg_body);
+}
+_ remove_outdated_check(int exit_code, cell actions) impure inline method_id
+{
+	throw_unless(100, exit_code == 0);
+	throw_if(110, actions_empty?(actions));
+}
+
+
+
+
+
+;; ---------------- Test sequence ----------------
+
+[int, tuple, cell, tuple, int] fourth_1a_data() method_id(0) {
+	int balance = 1000 * 1000;
+    int msg_value = 100 * 1000;
+
+	slice kkk1 = 0x15dd3f9b1bde67aa823566263367704ede4dac6e8b899278bec8c0b0811f.uto_slice(key_len);
+	slice vvv2 = 0x222222222.uto_slice(38);
+
+
+	slice sen = begin_cell().store_uint(4, 3).store_uint(10, 8).store_uint(111, 256).bto_slice();
+	slice rec = begin_cell().store_uint(4, 3).store_uint(10, 8).store_uint(111, 256).bto_slice();
+
+    slice in_msg_body = value1;
+    cell in_msg_full = begin_cell()
+        .store_uint(6, 4)
+        .store_slice(address_sender)
+        .store_slice(address_contract)
+        .store_grams(0)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+		.store_uint(1, 32)
+		.store_uint(242134, 64)
+        .store_slice(kkk1)
+		.store_slice(vvv2)
+        .end_cell();
+
+    tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+
+    return [0, stack, address_sender.to_cell(), get_c7(), null()];
+
+
+	dump_stack();
+	init();
+	slice kkk = key2;
+	~dump(kkk);
+	throw(90);
+	return set_entry_data(empty_cell, 81234, key1, valid_until_1, value1);
+}
+_ fourth_1a_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+	set_entry_check(exit_code, actions);
+}
+
+
+
+
+;; !!! Test with full 1023 payload
