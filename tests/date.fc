@@ -1,0 +1,8 @@
+﻿tuple my_get_c7() impure asm "c7 PUSH";
+[[int, int, int, int, int, int, int, (int), slice, int, [cell, cell]]] inner_get_c7() impure asm "c7 PUSH";
+() set_c7(tuple value) impure asm "c7 POP";
+
+() my_change_current_time(int time) impure method_id {
+    [int a1, int a2, int a3, int a4, int a5, int a6, int a7, (int) a8, slice a9, int a10, [cell, cell] a11] = inner_get_c7().unsafe_tuple().car();
+    set_c7(unsafe_tuple([[a1, a2, a3, time, a5, a6, a7, a8, a9, a10, a11]]));
+}
