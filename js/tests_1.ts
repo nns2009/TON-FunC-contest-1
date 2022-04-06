@@ -1,52 +1,57 @@
 import fs from 'fs';
 import executor, { SmartContract } from "ton-contract-executor";
-import ton, { Address, Cell, Slice, InternalMessage, CommonMessageInfo, toNano } from "ton";
+import ton, { Address, Cell, Slice, BitString, Builder, InternalMessage, CommonMessageInfo, toNano } from "ton";
 import BN from "bn.js";
 
-import { contractLoader } from './shared.js';
+import { contractLoader, assertEmpty, builder, int, slice, cell, sint, suint, internalMessage } from './shared.js';
 
 
 
 
-let expectedValue = new BN(0);
 
-let initialData = new Cell();
-initialData.bits.writeUint(expectedValue, 64);
+let expectedValue = int(0);
 
-
-
+let initialData = cell(suint(expectedValue, 64));
 let contract = await contractLoader('./../func/1.fc')(initialData);
 
 
 async function testAdd(value: number) {
-	let bodyCell = new Cell();
-	bodyCell.bits.writeUint(value, 32);
-	
-	let msg = new InternalMessage({
-		to: Address.parse('EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t'),
-		value: toNano(0),
-		bounce: false,
-		body: new CommonMessageInfo({
-			body: new ton.CellMessage(bodyCell),
-		}),
-	});
+	let msg = internalMessage(suint(value, 32));
 	
 	let result = await contract.sendInternalMessage(msg);
 	if (result.type !== 'success' || result.exit_code > 0) {
 		throw new Error(`exit_code = ${result.exit_code}`);
 	}
 	
-	const { exit_code, gas_consumed, action_list_cell } = result;
+	const { gas_consumed } = result;
 
-	expectedValue = expectedValue.add(new BN(value));
+	expectedValue = expectedValue.add(int(value));
 
-	let sl = Slice.fromCell(contract.dataCell);
-	let newNum = sl.readUint(64);
+	let sl = contract.dataCell.beginParse();
+	let storedNum = sl.readUint(64);
+	assertEmpty(sl);
 	
-	if (!expectedValue.eq(newNum)) {
-		throw new Error(`Incorrect value, expected: ${expectedValue.toString(10)}, found: ${newNum.toString(10)}`);
+	if (!expectedValue.eq(storedNum)) {
+		throw new Error(`Incorrect value, expected: ${expectedValue.toString(10)}, found: ${storedNum.toString(10)}`);
 	}
-	console.log(`testAdd(${value}) passed, value = ${newNum.toString(10)}, gas = ${gas_consumed}`);
+	console.log(`testAdd(${value}) passed, value = ${storedNum.toString(10)}, gas = ${gas_consumed}`);
+}
+
+async function testShort(value: number, len: number) {
+	if (len >= 32) throw new Error(`Incorrect testShort params: len = ${len}`);
+
+	let result = await contract.sendInternalMessage(internalMessage(suint(value, len)));
+	if (result.type !== 'failed')
+		throw new Error(`Contract should have thrown an exception with message of length ${len}`);
+
+	let sl = contract.dataCell.beginParse();
+	let storedNum = sl.readUint(64);
+	assertEmpty(sl);
+
+	if (!expectedValue.eq(storedNum))
+		throw new Error(`Contract data should not have changed, expected: ${expectedValue.toString(10)}, found: ${storedNum.toString(10)}`);
+	
+	console.log(`testShort(${value}, ${len}) passed, value = ${storedNum.toString()}`);
 }
 
 async function testGet() {
@@ -68,6 +73,7 @@ async function testGet() {
 await testGet();
 await testAdd(7);
 await testAdd(20);
+await testShort(40, 31);
 await testAdd(103);
 await testAdd(4009);
 await testGet();
@@ -76,5 +82,9 @@ await testAdd(600600);
 await testGet();
 await testAdd(7000004);
 await testAdd(80000003);
+await testShort(20, 7);
 await testAdd(900000002);
 await testGet();
+await testShort(0, 1);
+
+
