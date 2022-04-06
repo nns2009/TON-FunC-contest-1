@@ -1,0 +1,7 @@
+{
+  "name": "contest-1",
+  "packageManager": "yarn@3.2.0",
+  "dependencies": {
+    "ton-contract-executor": "^0.4.0"
+  }
+}
