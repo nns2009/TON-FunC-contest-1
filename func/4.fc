@@ -31,57 +31,73 @@ TASK 4 - HASHMAP STORAGE.
 
 (cell, cell) load_data() {
 	slice ds = get_data().begin_parse();
-	if (ds.slice_bits() == 0) {
-		return (null(), null());
+	if (ds.slice_refs() == 0) {
+		return (new_dict(), new_dict());
 	} else {
 		return (ds~load_dict(), ds~load_dict());
 	}
 }
 
 () save_data(cell data_dict, cell valid_until_dict) impure {
-	set_data(begin_cell().store_dict(data_dict).store_dict(valid_until_dict).end_cell());
+	set_data(begin_cell()
+		.store_dict(data_dict)
+		.store_dict(valid_until_dict)
+		.end_cell());
 }
 
 ;; testable
 () recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
 	int op = in_msg_body~load_uint(32);
 	int query_id = in_msg_body~load_uint(64);
+	throw(999);
 
 	(cell data_dict, cell valid_until_dict) = load_data();
 
 	if (op == 1) { ;; add new entry
 		int key = in_msg_body~load_uint(256);
-		int valid_until = in_msg_body~load_uint(64);
+		slice valid_until_sl = in_msg_body~load_bits(64);
+		;;int valid_until = in_msg_body~load_uint(64);
+		
 		slice value = in_msg_body;
 
 		data_dict~udict_set(256, key, value);
-		valid_until_dict~udict_set_ref(256, key, begin_cell().store_uint(valid_until, 64).end_cell());
+		valid_until_dict~udict_set(256, key, valid_until_sl);
+		
+		save_data(data_dict, valid_until_dict);
+		return ();
 	}
 
 	if (op == 2) { ;; remove outdated
 
 		int key = -1;
 		do {
-			(key, slice cs, int f) = valid_until.udict_get_next?(256, key);
+			(key, slice cs, int f) = valid_until_dict.udict_get_next?(256, key);
 			if (f) {
 				int valid_until = cs~load_uint(64);
 				if (valid_until < now()) {
-				valid_until~udict_delete(256, key);
-					data_dict~udict_delete(256, key);
+					valid_until_dict~udict_delete?(256, key);
+					data_dict~udict_delete?(256, key);
 				}
 			}
 		} until (~ f);
+
+		;; !!! check if dicts changed
+		save_data(data_dict, valid_until_dict);
+		return ();
 	}
 
-	save_data(data_dict, valid_until_dict);
+	throw (158);
 }
 
 ;; testable
 (int, slice) get_key(int key) method_id {
 	(cell data_dict, cell valid_until_dict) = load_data();
-
-	int valid_until = valid_until_dict~udict_get(key, 256)~load_uint(64);
-	slice value = data_dict~udict_get(key, 256).begin_parse();
+	
+	(slice valid_until_sl, int success) = valid_until_dict.udict_get?(256, key);
+	throw_unless(180, success);
+	int valid_until = valid_until_sl.preload_uint(64);
+	
+	(slice value, _) = data_dict.udict_get?(256, key);
 
 	return (valid_until, value);
 }
