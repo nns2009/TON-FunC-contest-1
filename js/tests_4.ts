@@ -4,66 +4,16 @@ import ton, { Address, Cell, Slice, BitString, Builder, InternalMessage, CommonM
 import seedrandom from 'seedrandom';
 import BN from "bn.js";
 
-import { contractLoader, assertEmpty, builder, int, slice, cell, sint, suint, internalMessage } from './shared.js';
+import { contractLoader, assertEmpty, internalMessage, createRandomGenerator } from './shared.js';
+import { builder, int, slice, cell, sint, suint } from './shared.js';
+import { bits2number, bits2string, bits2int, zeros, ones } from './shared.js';
 
 
-function reverseString(str:string): string {
-    return str.split("").reverse().join("");
-}
 
 
 const rand = seedrandom('111');
-
-const createRandomGenerator = (rand: seedrandom.PRNG) => {
-	function randomRange(min: number, max:number): number {
-		return rand() * (max - min) + min;
-	}
-
-	function randomInt(min: number, max:number): number {
-		return Math.floor(rand() * (max - min)) + min;
-	}
-
-	function randomChoice<T>(array: T[]): T {
-		return array[randomInt(0, array.length)];
-	}
-
-	function randomBits(bitLength: number): Cell {
-		const c = new Cell();
-		for (let i = 0; i < bitLength; i++) {
-			c.bits.writeBit(rand.int32() & 1);
-		}
-		return c;
-	}
-
-	return {
-		range: randomRange,
-		int: randomInt,
-		choice: randomChoice,
-		bits: randomBits,
-	};
-};
-
-
-
 const gen = createRandomGenerator(rand);
 
-function xbits(x: number, bitLength: number): Cell {
-	if (x !== 0 && x !== 1)
-		throw new Error(`xbits: incorrect x=(${x})`);
-
-	const c = new Cell();
-	for (let i = 0; i < bitLength; i++) {
-		c.bits.writeBit(x);
-	}
-	return c;
-}
-const zeros = (bitLength: number) => xbits(0, bitLength);
-const ones = (bitLength: number) => xbits(1, bitLength);
-
-
-const bits2number = (c: Cell) => parseInt(c.bits.toString(), 2);
-const bits2int = (c: Cell) => int(c.bits.toString(), 2);
-const bits2string = (c: Cell) => bits2int(c).toString('hex');
 
 
 

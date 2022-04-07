@@ -1,13 +1,27 @@
 import fs from 'fs';
 import executor, { SmartContract } from "ton-contract-executor";
 import ton, { Address, Cell, Slice, Builder, InternalMessage, CommonMessageInfo, toNano } from "ton";
+import seedrandom from 'seedrandom';
 import BN from "bn.js";
 
 
 
+
+// ------------------------ String functions ------------------------
+
 export function readString(filename: string): string {
 	return fs.readFileSync(new URL(filename, import.meta.url), 'utf-8');
 }
+
+
+export function reverseString(str:string): string {
+    return str.split("").reverse().join("");
+}
+
+
+
+
+// ------------------------ Contract functions ------------------------
 
 export const contractLoader = (filename: string) => {
 	const sourceCode = readString(filename);
@@ -16,6 +30,69 @@ export const contractLoader = (filename: string) => {
 
 
 
+
+// ------------------------ Random generators ------------------------
+
+export const createRandomGenerator = (rand: seedrandom.PRNG) => {
+	function randomRange(min: number, max:number): number {
+		return rand() * (max - min) + min;
+	}
+
+	function randomInt(min: number, max:number): number {
+		return Math.floor(rand() * (max - min)) + min;
+	}
+
+	function randomChoice<T>(array: T[]): T {
+		return array[randomInt(0, array.length)];
+	}
+
+	function randomBits(bitLength: number): Cell {
+		const c = new Cell();
+		for (let i = 0; i < bitLength; i++) {
+			c.bits.writeBit(rand.int32() & 1);
+		}
+		return c;
+	}
+
+	return {
+		range: randomRange,
+		int: randomInt,
+		choice: randomChoice,
+		bits: randomBits,
+	};
+};
+
+
+
+
+// ------------------------ Bit generation ------------------------
+
+export function xbits(x: number, bitLength: number): Cell {
+	if (x !== 0 && x !== 1)
+		throw new Error(`xbits: incorrect x=(${x})`);
+
+	const c = new Cell();
+	for (let i = 0; i < bitLength; i++) {
+		c.bits.writeBit(x);
+	}
+	return c;
+}
+export const zeros = (bitLength: number) => xbits(0, bitLength);
+export const ones = (bitLength: number) => xbits(1, bitLength);
+
+
+
+
+// ------------------------ Bit manipulations ------------------------
+
+export const bits2number = (c: Cell) => parseInt(c.bits.toString(), 2);
+export const bits2int = (c: Cell) => int(c.bits.toString(), 2);
+export const bits2string = (c: Cell) => bits2int(c).toString('hex');
+
+
+
+
+// ------------------------ Cell manipulations ------------------------
 
 export const builder = () => new Builder();
 export const int = (value: number | string, base?: number) => new BN(value, base);
@@ -48,6 +125,7 @@ export const internalMessage = (body: Cell) => new InternalMessage({
 
 
 
+// ------------------------ Assertions ------------------------
 
 export function assertEmpty(value: Slice) {
 	if (value.remaining != 0) {
