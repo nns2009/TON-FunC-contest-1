@@ -17,6 +17,9 @@ For messages from owner tests will check absence of outgoing messages.
 -}
 
 
+int slice_data_equal? (slice a, slice b) asm "SDEQ";
+
+
 ;; testable
 () recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
 	slice ds = get_data().begin_parse();
@@ -26,7 +29,11 @@ For messages from owner tests will check absence of outgoing messages.
 	cs~load_uint(4); ;; flags
 	slice sender_address = cs~load_msg_addr();
 	
-	;; !!! "except messages from owner itself"
+	
+	throw_if(0, slice_data_equal?(owner_address, sender_address));
+	;; if (slice_data_equal?(owner_address, sender_address)) {
+	;; 	return ();
+	;; }
 	
 	;; !!! check if cs has msg_body as a cell - that might save cell_creation in some cases
 

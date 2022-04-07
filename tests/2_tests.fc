@@ -5,62 +5,94 @@ global slice address3;
 global slice payload1;
 
 () init() impure inline method_id {
-    ;; slice address1 = begin_cell().store_uint(4, 3).store_uint(wc, 8).store_uint(addr, 256).end_cell();
-    address1 = begin_cell().store_uint(4, 3).store_uint(35, 8).store_uint(1111, 256).bto_slice();
-    address2 = begin_cell().store_uint(4, 3).store_uint(154, 8).store_uint(44444, 256).bto_slice();
-    address3 = begin_cell().store_uint(4, 3).store_uint(213, 8).store_uint(777777, 256).bto_slice();
-    
-    payload1 = begin_cell().store_uint(0xc79ef4a2d9f62e3524589863b094, 240).bto_slice();
+	;; slice address1 = begin_cell().store_uint(4, 3).store_uint(wc, 8).store_uint(addr, 256).end_cell();
+	address1 = begin_cell().store_uint(4, 3).store_uint(35, 8).store_uint(1111, 256).bto_slice();
+	address2 = begin_cell().store_uint(4, 3).store_uint(154, 8).store_uint(44444, 256).bto_slice();
+	address3 = begin_cell().store_uint(4, 3).store_uint(213, 8).store_uint(777777, 256).bto_slice();
+	
+	payload1 = begin_cell().store_uint(0xc79ef4a2d9f62e3524589863b094, 240).bto_slice();
 }
 
 
-[int, tuple, cell, tuple, int] test_1_data() method_id(0) {
-    init();
 
-    int balance = 1000 * 1000;
-    int msg_value = 100 * 1000;
+[int, tuple, cell, tuple, int] second_data(
+	cell data,
+	slice address_sender,
+	slice address_contract,
+	slice payload
+) inline method_id {
+	init();
 
-    slice in_msg_body = payload1;
-    cell in_msg_full = begin_cell()
-        .store_uint(6, 4)
-        .store_slice(address1)
-        .store_slice(address2)
-        .store_grams(0)
-        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_slice(in_msg_body)
-        .end_cell();
+	int balance = 1000 * 1000;
+	int msg_value = 100 * 1000;
 
-    tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+	slice in_msg_body = payload;
+	cell in_msg_full = begin_cell()
+		.store_uint(6, 4)
+		.store_slice(address_sender)
+		.store_slice(address_contract)
+		.store_grams(0)
+		.store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+		.store_slice(in_msg_body)
+		.end_cell();
 
-    return [0, stack, address3.to_cell(), get_c7(), null()];
+	tuple stack = unsafe_tuple([balance, msg_value, in_msg_full, in_msg_body]);
+
+	return [0, stack, data, get_c7(), null()];
+}
+
+
+
+
+
+
+
+
+[int, tuple, cell, tuple, int] second_1_data() method_id(0) {
+	init();
+	return second_data(address3.to_cell(), address1, address2, payload1);
 }
 
    
-_ test_1(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
-    init();
-    
-    throw_if(100, exit_code != 0);
-    
+_ second_1_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1) {
+	init();
+	
+	throw_if(100, exit_code != 0);
+	
 
-    ;; ---------------- Check storage
-    var ds = data.begin_parse();
-    throw_unless(104, slice_equal?(ds, address3));
-    
-    
-    ;; ---------------- Parse message
-    cell msg = extract_single_message_of_mode(actions, 64);
-    slice cs = msg.begin_parse();
+	;; ---------------- Check storage
+	var ds = data.begin_parse();
+	throw_unless(104, slice_equal?(ds, address3));
+	
+	
+	;; ---------------- Parse message
+	cell msg = extract_single_message_of_mode(actions, 64);
+	slice cs = msg.begin_parse();
 
-    cs~expect_uint(6, 4, 131); ;; flags
-    cs~expect_msg_addr(ito_slice(0, 2), 142);  ;; from = tested contract address
-    cs~expect_msg_addr(address3, 145); ;; owner_address
-    cs~expect_grams(0, 148); ;; !!! is this even correct?
-    cs~expect_zeros(1 + 4 + 4 + 64 + 32 + 1 + 1, 150);
-    cs~expect_msg_addr(address1, 153); ;; sender_address
-    cell inner_msg_body = cs~expect_single_ref(158);
-    cs~expect_empty(160);
-    
-    cs = inner_msg_body.begin_parse();
-    cs.assert_equal(payload1, 164);
+	cs~expect_uint(6, 4, 131); ;; flags
+	cs~expect_msg_addr(ito_slice(0, 2), 142);  ;; from = tested contract address
+	cs~expect_msg_addr(address3, 145); ;; owner_address
+	cs~expect_grams(0, 148); ;; !!! is this even correct?
+	cs~expect_zeros(1 + 4 + 4 + 64 + 32 + 1 + 1, 150);
+	cs~expect_msg_addr(address1, 153); ;; sender_address
+	cell inner_msg_body = cs~expect_single_ref(158);
+	cs~expect_empty(160);
+	
+	cs = inner_msg_body.begin_parse();
+	cs.assert_equal(payload1, 164);
 }
 
+
+;; Message from owner - nothing should happen
+[int, tuple, cell, tuple, int] second_2_data() method_id(10) {
+	init();
+	return second_data(address3.to_cell(), address3, address2, payload1);
+}
+_ second_2_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(11) {
+	init();
+	
+	slice cs = actions.begin_parse();
+	throw_unless(110, cs.slice_refs() == 0);
+	;; cell prev_actions = cs~load_ref();
+	;; throw_unless(120, cell_empty?(prev_actions));
+}
