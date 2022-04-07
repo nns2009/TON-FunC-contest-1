@@ -39,8 +39,9 @@ async function testAdd(value: number) {
 
 async function testShort(value: number, len: number) {
 	if (len >= 32) throw new Error(`Incorrect testShort params: len = ${len}`);
-
-	let result = await contract.sendInternalMessage(internalMessage(suint(value, len)));
+	let msg = internalMessage(suint(value, len));
+	
+	let result = await contract.sendInternalMessage(msg);
 	if (result.type !== 'failed')
 		throw new Error(`Contract should have thrown an exception with message of length ${len}`);
 
