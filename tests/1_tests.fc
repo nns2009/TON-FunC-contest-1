@@ -133,3 +133,15 @@ _ test_short_message_1(int exit_code, cell data, tuple stack, cell actions, int 
 _ test_short_message_2(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(1303) {
     throw_if(601, exit_code == 0);
 }
+
+
+
+
+[int, tuple, cell, tuple, int] test_3_data() method_id(2020) {
+    return add_message_test(200100, 32, 50);
+}
+_ test_3_check(int exit_code, cell data, tuple stack, cell actions, int gas) method_id(2021) {
+    add_message_check(exit_code, data, 200150);
+}
+
+
