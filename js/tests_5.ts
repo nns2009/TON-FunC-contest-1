@@ -25,9 +25,6 @@ const gen = createRandomGenerator(rand);
 
 const startingContractTime = 1000;
 
-const randomValidUntil = () => startingContractTime + gen.int(-10, 60 + 180);
-
-
 
 
 // ------------------------ Crypto ------------------------
@@ -91,10 +88,21 @@ function logSuccess(s: string) {
 	}
 }
 
+// Setting for testing other solutions which might throw different exit codes
+// !!! Turn back on
+const errorCodesStrict = true;
+function exitCodeIsError(exit_code: number, expectedFailureCode: number): boolean {
+	if (errorCodesStrict) return exit_code === expectedFailureCode;
+	else return exit_code !== 0 && exit_code !== 1;
+}
+
+
+let maxGas = 0;
 let totalGas = 0;
 let totalSuccess = 0;
 let totalDelayed = 0;
 let totalOutcoming = 0;
+let totalExceptions = 0;
 
 
 type Request = {
@@ -142,7 +150,7 @@ function createRequest(validUntil: number, mode: 0, bodyCell: Cell): Request {
 	};
 }
 
-const requests: Request[] = [];
+let requests: Request[] = [];
 const usedHashes: Set<string> = new Set<string>();
 
 function generateRequest(): Request {
@@ -172,6 +180,8 @@ function generateRequest(): Request {
 
 let currentContractTime = startingContractTime;
 
+const randomValidUntil = () => currentContractTime + gen.int(-10, 60 + 10);
+
 async function testExternal(request: Request, publicKey: Buffer, signature: Buffer) {
 	let msg = externalMessage(cell(
 		publicKey,
@@ -179,16 +189,25 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 	).withReference(request.requestCell));
 
 	contract.setUnixTime(currentContractTime);
-	let result = await contract.sendExternalMessage(msg);
+	let result;
+	try {
+		result = await contract.sendExternalMessage(msg);
+	} catch (ex) {
+		console.log('request', request);
+		console.log('publicKey', publicKey);
+		console.log(ex);
+		totalExceptions += 1;
+		return;
+	}
 
 	if (request.validUntil < currentContractTime) {
-		if (result.type !== 'failed' || result.exit_code !== 75) {
+		if (result.type !== 'failed' || !exitCodeIsError(result.exit_code, 75)) {
 			throw new Error(`Message shouldn't be accepted because valid_until is too old`);
 		}
 		logSuccess(`testExternal passed: valid_until < now() so the message got rejected`);
 	}
 	else if (request.validUntil > currentContractTime + 60) {
-		if (result.type !== 'failed' || result.exit_code !== 78) {
+		if (result.type !== 'failed' || !exitCodeIsError(result.exit_code, 78)) {
 			throw new Error(`Message valid_until is too long`);
 		}
 		//console.warn(request.validUntil, currentContractTime);
@@ -225,6 +244,7 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 				throw new Error(
 					`Message is ok and should have been accepted.
 					exit_code=${result.exit_code},
+					currentTime=${currentContractTime},
 					signed1: ${signed1}
 					signed2: ${signed2}
 					request=${JSON.stringify(request, null, 4)}
@@ -244,6 +264,7 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 						-> actions should be empty
 						request: ${JSON.stringify(request, null, 4)}`);
 				}
+				maxGas = Math.max(maxGas, result.gas_consumed);
 				totalGas += result.gas_consumed;
 				totalDelayed += 1;
 				totalSuccess += 1;
@@ -277,6 +298,7 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 					);
 				}
 
+				maxGas = Math.max(maxGas, result.gas_consumed);
 				totalGas += result.gas_consumed;
 				totalOutcoming += 1;
 				totalSuccess += 1;
@@ -292,7 +314,9 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 // ------------------------ Preparation ------------------------
 
 
-for (let i = 0; i < 250; i++) {
+const targetRequestPool = 30;
+
+for (let i = 0; i < targetRequestPool; i++) {
 	requests.push(generateRequest());
 }
 
@@ -302,17 +326,42 @@ for (let i = 0; i < 250; i++) {
 
 // ------------------------ Tests ------------------------
 
-const testsCount = 10000;
-const targetEndTime = 1200;
+const testsCount = 2000;
+const targetEndTime = 2000;
 const timeStepProbability = (targetEndTime - startingContractTime) / testsCount;
 
-
-
 const reportProgressEach = 100;
+
+if (true) {
+	const prefillCount = 700;
+
+	for (let i = 0; i < prefillCount; i++) {
+		if (i % reportProgressEach == 0) {
+			console.log(`Prefill: ${i}/${prefillCount} tests passed`);
+		}
+	
+		const req = generateRequest();
+		
+		//for (const sender of [owner1, owner2]) {
+			const sender = gen.choice([owner1, owner2]);
+			const signature = sign(req.requestCell, sender.privateKey);
+			const publicKeyParam = sender.publicKey;
+			await testExternal(req, publicKeyParam, signature);
+		//}
+	}
+	console.log(`Prefilled ${prefillCount}`);
+}
+
+
 
 for (let i = 0; i < testsCount; i++) {
 	if (i % reportProgressEach == 0) {
 		console.log(`Progress: ${i}/${testsCount} tests passed`);
+	}
+
+	requests = requests.filter(req => req.validUntil >= currentContractTime - 20); // remove old
+	while (requests.length < targetRequestPool) {
+		requests.push(generateRequest());
 	}
 
 	if (rand() < timeStepProbability) {
@@ -355,3 +404,5 @@ console.log(`${totalSuccess} transactions accepted`);
 console.log(`${totalDelayed} postponed and ${totalOutcoming} eventually sent`);
 console.log(`${totalGas} total gas spent`);
 console.log(`${(totalGas / totalSuccess).toFixed(3)} gas per transaction`);
+console.log(`${maxGas} max gas spent for one transaction`);
+console.log(`${totalExceptions} total unexpected exceptions`);
