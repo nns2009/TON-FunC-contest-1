@@ -97,7 +97,7 @@ async function testRemoveOutdated(now: number) {
 	contract.setUnixTime(now);
 	let result = await contract.sendInternalMessage(msg);
 	if (result.type !== 'success' || result.exit_code !== 0) {
-		throw new Error(`remove outdated (op=2) message caused crash, but it shouldn't have`);
+		throw new Error(`remove outdated (op=2, now=${now}) message caused crash, but it shouldn't have`);
 	}
 	const { gas_consumed } = result;
 
@@ -156,7 +156,7 @@ async function testGet(key: Cell) {
 
 	if (item) {
 		if (exres.type !== 'success' || exres.exit_code > 0) {
-			throw new Error(`Key (${keyString.substring(0, 12)}) is PRESENT in the database (valid until = ${item.validUntil}), but 'get_key' failed`);
+			throw new Error(`Key (${keyString.substring(0, 12)}) is PRESENT in the database (valid until = ${item.validUntil}), but 'get_key' failed (exit_code: ${exres.exit_code})`);
 		}
 		const [foundValidUntil, foundValue] = exres.result as [BN, Slice];
 		if (!item.validUntil.eq(foundValidUntil)) {
@@ -200,7 +200,7 @@ const maxValueLength = 1023
 await testTooShort();
 await testWrongOP();
 
-const testsCount = 10000;
+const testsCount = 30000;
 const reportProgressEach = 100;
 
 for (let i = 0; i < testsCount; i++) {
@@ -211,7 +211,11 @@ for (let i = 0; i < testsCount; i++) {
 	const r = rand();
 	
 	if (r < 0.001) {
-		const validUntil = randomValidUntil();
+		const r2 = rand();
+		const validUntil =
+			r2 < 0.1 ? 0 :
+			r2 < 0.3 ? (console.log(`Full wipe at test i=${i}`), 2 ** 48) :
+			randomValidUntil();
 		await testRemoveOutdated(validUntil);
 	} else if (r < 0.2) {
 		const key = gen.choice(keys);
