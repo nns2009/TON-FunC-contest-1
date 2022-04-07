@@ -1,6 +1,6 @@
 import fs from 'fs';
 import executor, { SmartContract } from "ton-contract-executor";
-import ton, { Address, Cell, Slice, Builder, InternalMessage, CommonMessageInfo, toNano } from "ton";
+import ton, { Address, Cell, Slice, Builder, InternalMessage, ExternalMessage, CommonMessageInfo, CellMessage, toNano } from "ton";
 import seedrandom from 'seedrandom';
 import BN from "bn.js";
 
@@ -19,6 +19,9 @@ export function reverseString(str:string): string {
 }
 
 
+export function bufferEqual(a: Buffer, b: Buffer): boolean {
+	return Buffer.compare(a, b) === 0;
+}
 
 
 // ------------------------ Contract functions ------------------------
@@ -95,19 +98,23 @@ export const bits2string = (c: Cell) => bits2int(c).toString('hex');
 // ------------------------ Cell manipulations ------------------------
 
 export const builder = () => new Builder();
-export const int = (value: number | string, base?: number) => new BN(value, base);
+export const int = (value: number | string | Buffer, base?: number) => new BN(value, base);
 export const slice = (cell: Cell) => Slice.fromCell(cell);
 
 export const sint = (value: number | BN, bitLength: number) => builder().storeInt(value, bitLength).endCell();
 export const suint = (value: number | BN, bitLength: number) => builder().storeUint(value, bitLength).endCell();
 
 
-export const cell = (...content: Cell[]) => {
+export const cell = (...content: (Cell | Buffer)[]) => {
 	// const b = builder();
 	const c = new Cell();
 
 	for (let v of content) {
-		c.writeCell(v);
+		if (v instanceof Cell) {
+			c.writeCell(v);
+		} else {
+			c.bits.writeBuffer(v);
+		}
 	}
 
 	return c;
@@ -118,10 +125,16 @@ export const internalMessage = (body: Cell) => new InternalMessage({
 	value: toNano(0),
 	bounce: false,
 	body: new CommonMessageInfo({
-		body: new ton.CellMessage(body),
+		body: new CellMessage(body),
 	}),
 });
 
+export const externalMessage = (body: Cell) => new ExternalMessage({
+	to: Address.parse('EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t'),
+	body: new CommonMessageInfo({
+		body: new CellMessage(body)
+	}),
+});
 
 
 

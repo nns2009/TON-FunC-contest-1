@@ -2,6 +2,7 @@ task1:
   func:
     - func/1.fc
   tests:
+    - tests/my.fc
     - tests/1_tests.fc
 
 task2:
