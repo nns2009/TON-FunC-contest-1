@@ -1,5 +1,23 @@
 {-
 
+seedrandom('111');
+
+Passed all 10000 tests!
+2096 transactions occured
+2083 set transactions and 13 remove transactions
+12697303 total gas spent
+6057.874 gas per transaction
+2 total unexpected exceptions
+
+
+Passed all 30000 tests!
+6008 transactions occured
+5968 set transactions and 40 remove transactions
+36415151 total gas spent
+6061.110 gas per transaction
+4 total unexpected exceptions
+
+
 TASK 4 - HASHMAP STORAGE.
 
 * Add-new-entry message has the following structure:
@@ -29,20 +47,14 @@ TASK 4 - HASHMAP STORAGE.
 
 -}
 
-(cell, cell) load_data() {
-	slice ds = get_data().begin_parse();
-	if (ds.slice_refs() == 0) {
-		return (new_dict(), new_dict());
+cell load_data() {
+	cell data = get_data();
+	slice ds = data.begin_parse();
+	if (ds.slice_bits() == 0) {
+		return new_dict();
 	} else {
-		return (ds~load_dict(), ds~load_dict());
+		return data;
 	}
-}
-
-() save_data(cell data_dict, cell valid_until_dict) impure {
-	set_data(begin_cell()
-		.store_dict(data_dict)
-		.store_dict(valid_until_dict)
-		.end_cell());
 }
 
 ;; testable
@@ -50,38 +62,41 @@ TASK 4 - HASHMAP STORAGE.
 	int op = in_msg_body~load_uint(32);
 	int query_id = in_msg_body~load_uint(64);
 
-	(cell data_dict, cell valid_until_dict) = load_data();
+
+
+	;; cell dic = load_data();
+	cell data = get_data();
+	slice ds = data.begin_parse();
+	cell dic = ds.slice_bits() == 0 ? new_dict() : data;
+
+
 
 	if (op == 1) { ;; add new entry
 		int key = in_msg_body~load_uint(256);
-		slice valid_until_sl = in_msg_body~load_bits(64);
-		;;int valid_until = in_msg_body~load_uint(64);
-		
-		slice value = in_msg_body;
-
-		data_dict~udict_set(256, key, value);
-		valid_until_dict~udict_set(256, key, valid_until_sl);
-		
-		save_data(data_dict, valid_until_dict);
+		dic~udict_set(256, key, in_msg_body);
+		set_data(dic);
 		return ();
 	}
 
 	if (op == 2) { ;; remove outdated
-
 		int key = -1;
 		do {
-			(key, slice cs, int f) = valid_until_dict.udict_get_next?(256, key);
+			(key, slice cs, int f) = dic.udict_get_next?(256, key);
 			if (f) {
 				int valid_until = cs~load_uint(64);
 				if (valid_until < now()) {
-					valid_until_dict~udict_delete?(256, key);
-					data_dict~udict_delete?(256, key);
+					dic~udict_delete?(256, key);
 				}
 			}
 		} until (~ f);
 
-		;; !!! check if dicts changed
-		save_data(data_dict, valid_until_dict);
+		;; !! check if dict changed
+		if (dic.dict_empty?()) {
+			set_data(begin_cell().end_cell());
+		} else {
+			set_data(dic);
+		}
+
 		return ();
 	}
 
@@ -90,13 +105,10 @@ TASK 4 - HASHMAP STORAGE.
 
 ;; testable
 (int, slice) get_key(int key) method_id {
-	(cell data_dict, cell valid_until_dict) = load_data();
-	
-	(slice valid_until_sl, int success) = valid_until_dict.udict_get?(256, key);
+	cell dic = load_data();
+	(slice payload, int success) = dic.udict_get?(256, key);
 	throw_unless(98, success);
-	int valid_until = valid_until_sl.preload_uint(64);
-	
-	(slice value, _) = data_dict.udict_get?(256, key);
 
-	return (valid_until, value);
+	int valid_until = payload~load_uint(64);
+	return (valid_until, payload);
 }
