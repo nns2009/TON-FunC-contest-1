@@ -21,7 +21,11 @@ const sendMessageActionCode = int(0x0ec3c86d);
 
 const rand = seedrandom('112');
 const gen = createRandomGenerator(rand);
-const randomValidUntil = () => 4; //bits2number(gen.bits(1)); // 4 significant digits for valid until
+
+
+const startingContractTime = 1000;
+
+const randomValidUntil = () => startingContractTime + gen.int(-10, 60 + 180);
 
 
 
@@ -107,9 +111,6 @@ type Request = {
 
 
 function createRequest(validUntil: number, mode: 0, bodyCell: Cell): Request {
-	
-	
-	
 	let messageToSend = new InternalMessage({
 		to: Address.parse('EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t'),
 		value: toNano(1),
@@ -169,7 +170,7 @@ function generateRequest(): Request {
 }
 
 
-let contractTime = 1000;
+let currentContractTime = startingContractTime;
 
 async function testExternal(request: Request, publicKey: Buffer, signature: Buffer) {
 	let msg = externalMessage(cell(
@@ -177,10 +178,26 @@ async function testExternal(request: Request, publicKey: Buffer, signature: Buff
 		signature
 	).withReference(request.requestCell));
 
-	contract.setUnixTime(0); // !!!! Remove !!!!
+	contract.setUnixTime(currentContractTime);
 	let result = await contract.sendExternalMessage(msg);
 
-	if (!bufferEqual(publicKey, owner1.publicKey) && !bufferEqual(publicKey, owner2.publicKey)) {
+	if (request.validUntil < currentContractTime) {
+		if (result.type !== 'failed' || result.exit_code !== 75) {
+			throw new Error(`Message shouldn't be accepted because valid_until is too old`);
+		}
+		logSuccess(`testExternal passed: valid_until < now() so the message got rejected`);
+	}
+	else if (request.validUntil > currentContractTime + 60) {
+		if (result.type !== 'failed' || result.exit_code !== 78) {
+			throw new Error(`Message valid_until is too long`);
+		}
+		//console.warn(request.validUntil, currentContractTime);
+		logSuccess(`testExternal passed: valid_until + 60 > now() so the message got rejected`);
+	}
+	else if (
+		!bufferEqual(publicKey, owner1.publicKey)
+		&& !bufferEqual(publicKey, owner2.publicKey))
+	{
 		if (result.type !== 'failed' || result.exit_code == 0) {
 			throw new Error(`This publicKey is not even correct -> contract should throw`);
 		}
@@ -286,12 +303,20 @@ for (let i = 0; i < 250; i++) {
 // ------------------------ Tests ------------------------
 
 const testsCount = 10000;
-const reportProgressEach = 100;
+const targetEndTime = 1200;
+const timeStepProbability = (targetEndTime - startingContractTime) / testsCount;
 
+
+
+const reportProgressEach = 100;
 
 for (let i = 0; i < testsCount; i++) {
 	if (i % reportProgressEach == 0) {
 		console.log(`Progress: ${i}/${testsCount} tests passed`);
+	}
+
+	if (rand() < timeStepProbability) {
+		currentContractTime++;
 	}
 
 	const req = gen.choice(requests);
@@ -324,8 +349,9 @@ for (let i = 0; i < testsCount; i++) {
 
 console.log();
 console.log('-'.repeat(30));
+console.log(`Final now(): ${currentContractTime}`);
 console.log(`Passed all ${testsCount} tests!`);
-console.log(`${totalSuccess} transactions occured`);
+console.log(`${totalSuccess} transactions accepted`);
 console.log(`${totalDelayed} postponed and ${totalOutcoming} eventually sent`);
 console.log(`${totalGas} total gas spent`);
 console.log(`${(totalGas / totalSuccess).toFixed(3)} gas per transaction`);
