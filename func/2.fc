@@ -23,12 +23,11 @@ int slice_data_equal? (slice a, slice b) asm "SDEQ";
 ;; testable
 () recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
 	slice ds = get_data().begin_parse();
-	slice owner_address = ds~load_msg_addr(); ;; !!! preload?
+	slice owner_address = ds~load_msg_addr();
 
 	slice cs = in_msg_full.begin_parse();
-	cs~load_uint(4); ;; flags
+	cs~skip_bits(4); ;; cs~load_uint(4); ;; flags
 	slice sender_address = cs~load_msg_addr();
-	
 	
 	throw_if(0, slice_data_equal?(owner_address, sender_address));
 	;; if (slice_data_equal?(owner_address, sender_address)) {
