@@ -1,5 +1,12 @@
 {-
 
+Gas usage
+request: 2261
+change failure: 918
+change success: 1585
+
+
+
 TASK 3 - ADDRESS MEMORIZER.
 
 The aim of address memorizer contract is to remember the address set by Manager and report it to anyone who request this information.
@@ -41,46 +48,38 @@ The initial address memorizer storage contains Manager address immediately follo
 
 int slice_data_equal? (slice a, slice b) asm "SDEQ";
 
-(slice, slice) load_data () {
-	var ds = get_data().begin_parse();
-	return (ds~load_msg_addr(), ds~load_msg_addr());
-}
-
-() save_data (slice manager_address, slice memorized_address) impure inline {
-	set_data(
-		begin_cell()
-		.store_slice(manager_address)
-		.store_slice(memorized_address)
-		.end_cell()
-	);
-}
-
-;; Parse sender address from incoming message
-slice parse_sender_address (cell in_msg_full) inline {
-	slice cs = in_msg_full.begin_parse();
-	cs~load_uint(4); ;; !!! skip_bits?
-	slice sender_address = cs~load_msg_addr();
-	return sender_address;
-}
 
 ;; testable
 () recv_internal (int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
-	(slice manager_address, slice memorized_address) = load_data(); ;; !!! replace
 	int op = in_msg_body~load_uint(32);
-	int query_id = in_msg_body~load_uint(64); ;; op==1 skip_bits?
+	int query_id = in_msg_body~load_uint(64);
+
+
+	slice cs = in_msg_full.begin_parse();
+	cs~skip_bits(4);
+	slice sender_address = cs~load_msg_addr();
+
 	
+	var ds = get_data().begin_parse();
+
+
 	if (op == 1) {
-		slice cs = in_msg_full.begin_parse();
-		cs~load_uint(4); ;; !!! skip_bits?
-		slice source_address = cs~load_msg_addr(); ;; !!! preload_msg_addr?
-		throw_unless(102, slice_data_equal?(source_address, manager_address));
+		slice manager_address = ds~load_msg_addr();
+
+		throw_unless(102, slice_data_equal?(sender_address, manager_address));
 		
 		slice new_address = in_msg_body~load_msg_addr(); 
-		save_data(manager_address, new_address);
+
+		set_data(
+			begin_cell()
+			.store_slice(manager_address)
+			.store_slice(new_address)
+			.end_cell()
+		);
 		return ();
 	}
+
 	if (op == 2) {
-		slice sender_address = parse_sender_address(in_msg_full);
 		cell msg = begin_cell()
 					.store_uint(0x18, 6)
 					.store_slice(sender_address)
@@ -88,8 +87,9 @@ slice parse_sender_address (cell in_msg_full) inline {
 					.store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
 					.store_uint(3, 32)
 					.store_uint(query_id, 64)
-					.store_slice(manager_address) ;; !!! unite this line and the next
-					.store_slice(memorized_address)
+					;; .store_slice(manager_address)
+					;; .store_slice(memorized_address)
+					.store_slice(ds) ;; ds = manager_address + memorized_address
 				.end_cell();
 		send_raw_message(msg, 64);
 		return ();
