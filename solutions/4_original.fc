@@ -1,0 +1,112 @@
+{-
+
+seedrandom('111');
+
+Passed all 10000 tests!
+2096 transactions occured
+2083 set transactions and 13 remove transactions
+25347333 total gas spent
+12093.193 gas per transaction
+2 total unexpected exceptions
+
+
+TASK 4 - HASHMAP STORAGE.
+
+* Add-new-entry message has the following structure:
+	* 32-bit unsigined `op` equal to 1
+	* 64-bit unsigned `query_id`
+	* 256-bit unsgined key
+	* 64-bit `valid_until` unixtime
+	* the rest slice is the value
+
+	Upon receipt of such a message, the contract must add a new key/value entry to its data.
+	Clarification: if the key already exists then the entry must be replaced.
+	Contract storage format is arbitrary, you are free to change it.
+
+* Remove-outdated message has the following stucture:
+	* 32-bit unsigined `op` equal to 2
+	* 64-bit unsigned `query_id`
+
+	Upon receipt of such a message, the contract must delete all otudated entries from its data (those with `valid_until` < now()). Note, tests will not cover cases when messages contain valid `op=2`, `query_id` and then something else (that means that participants may handle such messages at their discretion).
+
+* For all other internal messages an error (exit_code > 1) should be thrown
+
+* Get-method `get_key` accepts 256-bit unsignied key and should return `valid_until` integer and value data slice for this key. Note: unixtime of running `get_key` method should not affect result.
+
+  If there is no entry for this key then an error (exit_code > 1) should be thrown.
+
+* Tests will initially run with empty storage
+
+-}
+
+(cell, cell) load_data() {
+	slice ds = get_data().begin_parse();
+	if (ds.slice_refs() == 0) {
+		return (new_dict(), new_dict());
+	} else {
+		return (ds~load_dict(), ds~load_dict());
+	}
+}
+
+() save_data(cell data_dict, cell valid_until_dict) impure {
+	set_data(begin_cell()
+		.store_dict(data_dict)
+		.store_dict(valid_until_dict)
+		.end_cell());
+}
+
+;; testable
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
+	int op = in_msg_body~load_uint(32);
+	int query_id = in_msg_body~load_uint(64);
+
+	(cell data_dict, cell valid_until_dict) = load_data();
+
+	if (op == 1) { ;; add new entry
+		int key = in_msg_body~load_uint(256);
+		slice valid_until_sl = in_msg_body~load_bits(64);
+		;;int valid_until = in_msg_body~load_uint(64);
+		
+		slice value = in_msg_body;
+
+		data_dict~udict_set(256, key, value);
+		valid_until_dict~udict_set(256, key, valid_until_sl);
+		
+		save_data(data_dict, valid_until_dict);
+		return ();
+	}
+
+	if (op == 2) { ;; remove outdated
+
+		int key = -1;
+		do {
+			(key, slice cs, int f) = valid_until_dict.udict_get_next?(256, key);
+			if (f) {
+				int valid_until = cs~load_uint(64);
+				if (valid_until < now()) {
+					valid_until_dict~udict_delete?(256, key);
+					data_dict~udict_delete?(256, key);
+				}
+			}
+		} until (~ f);
+
+		;; !!! check if dicts changed
+		save_data(data_dict, valid_until_dict);
+		return ();
+	}
+
+	throw (12);
+}
+
+;; testable
+(int, slice) get_key(int key) method_id {
+	(cell data_dict, cell valid_until_dict) = load_data();
+	
+	(slice valid_until_sl, int success) = valid_until_dict.udict_get?(256, key);
+	throw_unless(98, success);
+	int valid_until = valid_until_sl.preload_uint(64);
+	
+	(slice value, _) = data_dict.udict_get?(256, key);
+
+	return (valid_until, value);
+}
