@@ -18,14 +18,14 @@ export const contractLoader = (filename: string) => {
 
 
 export const builder = () => new Builder();
-export const int = (value: number) => new BN(value);
+export const int = (value: number | string, base?: number) => new BN(value, base);
 export const slice = (cell: Cell) => Slice.fromCell(cell);
 
 export const sint = (value: number | BN, bitLength: number) => builder().storeInt(value, bitLength).endCell();
 export const suint = (value: number | BN, bitLength: number) => builder().storeUint(value, bitLength).endCell();
 
 
-export const cell = (...content: [Cell]) => {
+export const cell = (...content: Cell[]) => {
 	// const b = builder();
 	const c = new Cell();
 

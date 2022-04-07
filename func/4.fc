@@ -49,7 +49,6 @@ TASK 4 - HASHMAP STORAGE.
 () recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) {
 	int op = in_msg_body~load_uint(32);
 	int query_id = in_msg_body~load_uint(64);
-	throw(999);
 
 	(cell data_dict, cell valid_until_dict) = load_data();
 
@@ -86,7 +85,7 @@ TASK 4 - HASHMAP STORAGE.
 		return ();
 	}
 
-	throw (158);
+	throw (12);
 }
 
 ;; testable
@@ -94,7 +93,7 @@ TASK 4 - HASHMAP STORAGE.
 	(cell data_dict, cell valid_until_dict) = load_data();
 	
 	(slice valid_until_sl, int success) = valid_until_dict.udict_get?(256, key);
-	throw_unless(180, success);
+	throw_unless(98, success);
 	int valid_until = valid_until_sl.preload_uint(64);
 	
 	(slice value, _) = data_dict.udict_get?(256, key);
