@@ -52,6 +52,7 @@ cell pack_data(int public_key1, int public_key2) method_id {
 	slice rs = request.begin_parse();
 	int valid_until = rs~load_uint(32);
 	throw_if(75, valid_until < now());
+	throw_if(78, valid_until > now() + 60);
 	int mode = rs~load_uint(8);
 	cell msg_to_send = rs~load_ref();
 
